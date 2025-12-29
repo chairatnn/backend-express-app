@@ -10,7 +10,7 @@ try {
   await connectDB();
 
   app.listen(port, () => {
-    console.log(`Example app listening on port ${port}`);
+    console.log(`Server running on port ${port}`);
   });
 } catch (error) {
   console.error("Started failed 🚫", error);
