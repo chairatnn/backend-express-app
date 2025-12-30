@@ -1,33 +1,9 @@
+import { Error } from "mongoose";
 import { users } from "../../mock-db/users.js";
 import { User } from "./user.model.js";
 
-// ✅ route handler: GET a single user by id from the database
-export const getUser2 = async (req, res) => {
-  const { id } = req.params;
 
-  try {
-    const doc = await User.findById(id).select("-password");
-
-    if (!doc) {
-      return res.status(400).json({
-        success: false,
-        error: "User not found...",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: doc,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      error: "Failed to get a user...",
-    });
-  }
-};
-
-// ==========
+// 🟡 API v1
 // export const testAPI = (req, res) => {
 //   res.send("Hello Real World!, I'm your server.🔋");
 //   res.send(`<!doctype html>
@@ -61,28 +37,11 @@ export const getUser2 = async (req, res) => {
 //     </body>
 //   </html>`);
 // };
-// ===========
 
 // 🚫 route handler: get all user (mock)
 export const getUsers1 = (req, res) => {
   res.status(200).json(users);
   console.log(res);
-};
-
-// ✅ route handler: get all users from the database
-export const getUsers2 = async (req, res) => {
-  try {
-    const users = await User.find().select("-password");
-    return res.status(200).json({
-      success: true,
-      data: users,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      error: "Failed to get users...",
-    });
-  }
 };
 
 // 🚫 route handler: delete a user (mock)
@@ -94,32 +53,6 @@ export const deleteUser1 = (req, res) => {
     res.status(200).send(`User with ID ${userId} deleted ☠️`);
   } else {
     res.status(404).send("User not found.");
-  }
-};
-
-// ✅ route handler: deleted a new user in the database
-export const deleteUser2 = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const deleted = await User.findByIdAndDelete(id);
-
-    if (!deleted) {
-      return res.status(404).json({
-        success: false,
-        error: "User not found...",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: null,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      error: "Failed to delete user...",
-    });
   }
 };
 
@@ -135,15 +68,101 @@ export const createUser1 = (req, res) => {
   res.status(201).json(newUser);
 };
 
+
+// 🟢 API v2
+// ✅ route handler: GET a single user by id from the database
+export const getUser2 = async (req, res, next) => {
+  const { id } = req.params;
+
+  try {
+    const doc = await User.findById(id).select("-password");
+
+    if (!doc) {
+      const error = new Error("User not found");
+      return next(error);
+      // return res.status(400).json({
+      //   success: false,
+      //   error: "User not found...",
+      // });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: doc,
+    });
+  } catch (error) {
+    error.status = 500;
+    error.name = error.name || "DatabaseError";
+    error.message = error.message || "Failed to get a user";
+    return next(error);
+    // return res.status(500).json({
+    //   success: false,
+    //   error: "Failed to get a user...",
+    // });
+  }
+};
+
+// ✅ route handler: get all users from the database
+export const getUsers2 = async (req, res, next) => {
+  try {
+    const users = await User.find().select("-password");
+    return res.status(200).json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    // error.name = error.name || "DatabaseError"
+    // error.status = 500;
+    return next(error);
+    // return res.status(500).json({
+    //   success: false,
+    //   error: "Failed to get users...",
+    // });
+  }
+};
+
+// ✅ route handler: deleted a new user in the database
+export const deleteUser2 = async (req, res, next) => {
+  const { id } = req.params;
+
+  try {
+    const deleted = await User.findByIdAndDelete(id);
+
+    if (!deleted) {
+      const error = new Error("User not found");
+      return next(error);
+      // return res.status(404).json({
+      //   success: false,
+      //   error: "User not found...",
+      // });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: null,
+    });
+  } catch (error) {
+    return next(error);
+    // return res.status(500).json({
+    //   success: false,
+    //   error: "Failed to delete user...",
+    // });
+  }
+};
+
 // ✅ route handler: create a new user in the database
-export const createUser2 = async (req, res) => {
+export const createUser2 = async (req, res, next) => {
   const { username, email, password, role } = req.body;
 
   if (!username || !email || !password) {
-    return res.status(400).json({
-      success: false,
-      error: "username, email, and password are required",
-    });
+    new Error("username, email, and password are required");
+    error.name = "ValidationError";
+    error.status = 400;
+    return next();
+    // return res.status(400).json({
+    //   success: false,
+    //   error: "username, email, and password are required",
+    // });
   }
 
   try {
@@ -158,21 +177,28 @@ export const createUser2 = async (req, res) => {
     });
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(409).json({
-        success: false,
-        error: "Email already in use!",
-      });
+      error.code = 409;
+      error.name = "DuplicateKeyError";
+      error.message = "Email already in use";
     }
+    error.status = 500;
+    error.name = error.name || "DatabaseError";
+    error.message = "Email to create a user";
+    return next(error);
 
-    return res.status(500).json({
-      success: false,
-      error: "Failed to create user...",
-    });
+    // return res.status(409).json({
+    //   success: false,
+    //   error: "Email already in use!",
+    // });
+    // return res.status(500).json({
+    //   success: false,
+    //   error: "Failed to create user...",
+    // });
   }
 };
 
 // ✅ route handler: update a user in the database
-export const updateUser2 = async (req, res) => {
+export const updateUser2 = async (req, res, next) => {
   const { id } = req.params;
 
   const body = req.body;
@@ -181,10 +207,12 @@ export const updateUser2 = async (req, res) => {
     const updated = await User.findByIdAndUpdate(id, body);
 
     if (!updated) {
-      return res.status(404).json({
-        success: false,
-        error: "User not found...",
-      });
+      const error = new Error("User not found");
+      return next(error);
+      // return res.status(404).json({
+      //   success: false,
+      //   error: "User not found...",
+      // });
     }
 
     const safe = updated.toObject();
@@ -196,15 +224,16 @@ export const updateUser2 = async (req, res) => {
     });
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(409).json({
-        success: false,
-        error: "Email already in use!",
-      });
+      return next(error);
+      // return res.status(409).json({
+      //   success: false,
+      //   error: "Email already in use!",
+      // });
     }
-
-    return res.status(500).json({
-      success: false,
-      error: "Failed to update user...",
-    });
+    return next(error);
+    // return res.status(500).json({
+    //   success: false,
+    //   error: "Failed to update user...",
+    // });
   }
 };
