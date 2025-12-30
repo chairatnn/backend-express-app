@@ -17,6 +17,9 @@ app.use(cors(corsOption));
 
 app.use(express.json());
 
+app.get("/",(req, res)=>{
+  res.send("Hello JSD")
+})
 app.use("/api", apiRoutes);
 
 // catch-all for 404 Not Found
